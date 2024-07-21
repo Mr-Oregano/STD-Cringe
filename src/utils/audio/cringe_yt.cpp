@@ -52,7 +52,7 @@ bool CringeYoutube::is_playlist(const std::string &query) {
 
 std::string CringeYoutube::search_command(std::string search) {
     return fmt::format(
-        R"(yt-dlp -f bestaudio -o - -vn "{}")", search);
+        R"(yt-dlp -o - -vn "{}")", search);
 }
 
 std::string CringeYoutube::search(const std::string &query) {

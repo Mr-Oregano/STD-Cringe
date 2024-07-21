@@ -9,7 +9,7 @@ class CringeBot {
 private:
 	std::string _token;
 public:
-	std::vector<std::string> models = {"cringe", "ethan", "klim", "joeman"};
+	std::vector<std::string> models = {"cringe", "ethan", "klim", "joeman", "biden", "trump"};
 	CringeQueue queue;
 	CringeOllama ollama;
 	dpp::cluster cluster;

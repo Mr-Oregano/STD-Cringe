@@ -47,7 +47,8 @@ void process_slashcommand(const dpp::slashcommand_t &event,  CringeBot &cringe) 
 		confession_command(cringe, event);
 	}
 	else if (event.command.get_command_name() == "reddit") {
-		reddit_command(cringe, event);
+    std::thread reddit(reddit_command, std::ref(cringe), event);
+    reddit.detach();
 	}
 	else if (event.command.get_command_name() == "imagine") {
 		std::thread imagine(image_command, std::ref(cringe), event);
