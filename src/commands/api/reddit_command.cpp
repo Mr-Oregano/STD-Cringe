@@ -33,6 +33,7 @@
 #include <iostream>
 #include <string>
 #include <ctime>
+#include <random>
 
 dpp::slashcommand reddit_declaration() {
 	return dpp::slashcommand()
@@ -698,115 +699,116 @@ const std::vector<std::string> SUBREDDITS = {
 		"drunkdrunkenporn"
 };
 
-void reddit_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
-	event.thinking();
-	CringeCurl curl;
-	std::string subreddit = std::get<std::string>(event.get_parameter("subreddit"));
-	if (subreddit == "random") {
-		std::time_t t = std::time(0);
-		const int index = t % SUBREDDITS.size();
-		subreddit = SUBREDDITS[index];
+
+int getRandomNumber(int min, int max) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<> distr(min, max);
+	return distr(gen);
+}
+
+std::string getRandomSubreddit(const std::vector<std::string> &subreddits) {
+	int index = getRandomNumber(0, subreddits.size() - 1);
+	return subreddits[index];
+}
+
+json getRandomPost(const json &valid_posts) {
+	if (valid_posts.empty())
+		return json();
+
+	int index = getRandomNumber(1, valid_posts.size() - 1);
+	if (valid_posts.contains(std::to_string(index))) {
+		return valid_posts[std::to_string(index)];
+	}
+	return json();
+}
+
+json extractValidPosts(const json& response) {
+	json valid_posts;
+	int count = 0;
+
+	for (const auto& child : response["data"]["children"]) {
+		const json& data = child["data"];
+		auto imageUrlIt = data.find("url_overridden_by_dest");
+
+		if (imageUrlIt != data.end() && imageUrlIt->get<std::string>().find("i.redd.it") != std::string::npos) {
+			json post = {
+					{"author", data.value("author", "N/A")},
+					{"description", data.value("selftext", "N/A")},
+					{"image", *imageUrlIt},
+					{"subreddit", data.value("subreddit", "N/A")}
+			};
+			valid_posts[std::to_string(++count)] = post;
+		}
 	}
 
-	std::string top = std::get<std::string>(event.get_parameter("top"));
-	int limit = 100;
-	if (top == "random") {
-		limit = 500;
-		std::time_t t = std::time(0);
-		const std::vector<std::string> choices = {"day", "month", "year", "all"};
-		const int index = t % 4;
-		top = choices[index];
-	}
-	std::string URL = fmt::format("https://old.reddit.com/r/{}/top/.json?sort=top&limit={}&t={}", subreddit, limit, top);
+	return valid_posts;
+}
 
-	const std::vector<std::string> headers = {
+std::string getRandomTimePeriod() {
+	std::vector<std::string> choices = {"month", "year", "all"};
+	int index = getRandomNumber(0, choices.size() - 1);
+	return choices[index];
+}
+
+json fetchSubredditData(const std::string& subreddit, const std::string& top, int limit) {
+	std::string url = fmt::format("https://old.reddit.com/r/{}/top/.json?sort=top&limit={}&t={}", subreddit, limit, top);
+	std::vector<std::string> headers = {
 			"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
 			"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/png,image/svg+xml,*/*;q=0.8"
 	};
 
-	std::string subreddits;
-	std::string image;
-	std::string author;
-	std::string description;
-	json subreddit_response;
-	json initial_response;
+	CringeCurl curl;
+	return curl.get(url, headers);
+}
+
+void reddit_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
+	event.thinking();
+	CringeCurl curl;
+
+	std::string subreddit = std::get<std::string>(event.get_parameter("subreddit"));
+	std::string top = std::get<std::string>(event.get_parameter("top"));
+
+	int limit = (top == "random") ? 1000 : 25;
 
 	try {
-		subreddit_response = curl.get(URL, headers);
-		initial_response = subreddit_response["data"]["children"];
-		json response;
-
-		json valid_posts;
-
-		int iterable = 0;
-		for (auto &el: initial_response.items()) {
-			json data = el.value();
-			data = data["data"];
-			auto im = data.find("url_overridden_by_dest");
-			if (im != data.end()) {
-				image = *im;
-				if (image.find("i.redd.it") != std::string::npos) {
-					iterable++;
-					auto subr = data.find("subreddit_name_prefixed");
-					subreddits = *subr;
-					auto aut = data.find("author");
-					author = *aut;
-					auto des = data.find("selftext");
-					description = *des;
-					image = *im;
-					valid_posts[fmt::format("{}", iterable)] = json::object(
-							{
-									{"author",      author},
-									{"description", description},
-									{"image",       image},
-									{"subreddit",   subreddit}
-							}
-					);
-				}
-			}
+		if (subreddit == "random") {
+			subreddit = getRandomSubreddit(SUBREDDITS);
 		}
-		json post;
-
-		// Get value
-		if (top == "random"){
-			std::time_t t = std::time(0);
-			const int index = t % valid_posts.size();
-			post = *valid_posts.find(fmt::format("{}", iterable));
-		} else {
-			post = valid_posts.front();
+		if (top == "random") {
+			top = getRandomTimePeriod();
 		}
 
-		if(post.empty()) {
+		json response = fetchSubredditData(subreddit, top, limit);
+		json valid_posts = extractValidPosts(response);
+		json post = getRandomPost(valid_posts);
+
+		if (post.empty()) {
 			CringeEmbed cringe_embed;
 			cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
 			cringe_embed.setColor(CringeColor::CringeError);
 			cringe_embed.setFields({{"Error", "No valid posts could be obtained!", "false"}});
 			dpp::message msg(event.command.channel_id, cringe_embed.embed);
 			event.edit_original_response(msg);
-		} else {
-			CringeEmbed cringe_embed;
-			cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
-			cringe_embed.setFields(
-					{
-							{"Subreddit",   post["subreddit"],  "true"},
-							{"Author",      post["author"],      "true"},
-							{"description", post["description"], "false"}
-					}
-			);
-			cringe_embed.setImage(post["image"]);
-			// json response_data = parse_reddit_response(subreddit_response);
-			// dpp::embed embed = reddit_embed(response);
-			// std::string gif = make_gif(response_data["video"]);
-			dpp::message msg(event.command.channel_id, cringe_embed.embed);
-			event.edit_original_response(msg);
+			return;
 		}
-	}
-	catch (const json::invalid_iterator& e) {
-		std::cout << "HERE!\n";
+		CringeEmbed cringe_embed;
+		cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
+		cringe_embed.setFields(
+				{
+						{"Subreddit",   post["subreddit"],   "true"},
+						{"Author",      post["author"],      "true"},
+						{"description", post["description"], "false"}
+				}
+		);
+		cringe_embed.setImage(post["image"]);
+		dpp::message msg(event.command.channel_id, cringe_embed.embed);
+		event.edit_original_response(msg);
+	} catch (const json::invalid_iterator &e) {
 		CringeEmbed cringe_embed;
 		cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
 		cringe_embed.setColor(CringeColor::CringeError);
-		cringe_embed.setFields({{"Error", "No valid subreddit could be obtained!", "false"}});
+		cringe_embed.setFields({{"Error!!!", fmt::format("{}", "you stupid idiot. KLIM!"), "false"}});
 		dpp::message msg(event.command.channel_id, cringe_embed.embed);
 		event.edit_original_response(msg);
 		return;
