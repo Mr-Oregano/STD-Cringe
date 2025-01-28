@@ -24,34 +24,57 @@
 
 #include "utils/audio/cringe_queue.h"
 
-void CringeQueue::enqueue(CringeSong &song) {
-    cringe_queue.push(song);
-    length++;
-}
+// bool CringeQueue::is_empty() const {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     return queue_.empty();
+// }
 
-CringeSong CringeQueue::dequeue() {
-    length--;
-	CringeSong contents = cringe_queue.front();
-    cringe_queue.pop();
-    return contents;
-}
+// size_t CringeQueue::size() const {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     return queue_.size();
+// }
 
-std::queue<CringeSong> CringeQueue::get_queue() { return cringe_queue; }
+// void CringeQueue::enqueue(const CringeSong& song) {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     if (queue_.size() >= MAX_QUEUE_SIZE) {
+//         throw std::runtime_error("Queue is full");
+//     }
+//     queue_.push(song);
+// }
 
-void CringeQueue::display_queue() const {
-    if (!is_empty()) {
-        std::cout << "Song Queue:" << std::endl;
-        std::queue<CringeSong> t_q = cringe_queue;
-    } else {
-        std::cout << "Queue is empty." << std::endl;
-    }
-}
+// std::optional<CringeSong> CringeQueue::dequeue() {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     if (queue_.empty()) {
+//         return std::nullopt;
+//     }
+//     CringeSong song = std::move(queue_.front());
+//     queue_.pop();
+//     return song;
+// }
 
-bool CringeQueue::is_empty() const { return cringe_queue.empty(); }
+// std::optional<std::string> CringeQueue::peek() const {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     if (queue_.empty()) {
+//         return std::nullopt;
+//     }
+//     return queue_.front().title;
+// }
 
-std::string CringeQueue::peek() {
-    if (!is_empty()) {
-        return cringe_queue.front().title;
-    } else
-        return "";
-}
+// std::vector<CringeSong> CringeQueue::get_queue() const {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     std::vector<CringeSong> songs;
+//     songs.reserve(queue_.size());
+    
+//     auto temp = queue_;
+//     while (!temp.empty()) {
+//         songs.push_back(std::move(temp.front()));
+//         temp.pop();
+//     }
+    
+//     return songs;
+// }
+
+// void CringeQueue::clear() {
+//     std::lock_guard<std::mutex> lock(mutex_);
+//     std::queue<CringeSong>().swap(queue_);
+// }

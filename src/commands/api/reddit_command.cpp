@@ -69,59 +69,6 @@ std::string make_gif(std::string url) {
 	return gif;
 }
 
-dpp::embed reddit_embed(json data) {
-	std::string author = data["author"];
-	std::string subreddit = data["subreddit"];
-	std::string title = data["title"];
-	std::string description = data["description"];
-	int creation = data["time_created"];
-	std::string comments = to_string(data["comments"]);
-	std::string upvotes = to_string(data["upvotes"]);
-	auto media = data["media"];
-	auto e = data["media_embed"];
-	float ratio = data["upvote_ratio"];
-	auto video = data["video"];
-
-	dpp::embed embed;
-
-	embed.set_color(CringeColor::CringePrimary)
-			.set_title("Cringe Crawler")
-			.set_thumbnail(CringeIcon::LightningIcon)
-			.add_field("", "+-----------------------------------------------------------------+")
-			.add_field("Subreddit", subreddit, true)
-			.add_field("Author", author, true)
-			.add_field("Posted", fmt::format("<t:{}:D>", creation), true)
-			.add_field("Comments", comments, true)
-			.add_field("Upvotes", upvotes, true)
-			.add_field("Upvote Ratio", fmt::format("{}%", ratio * 100), true)
-			.add_field("", "+-----------------------------------------------------------------+");
-
-	if (!title.empty()) {
-		embed.add_field("Title", title);
-		embed.add_field("", "+-----------------------------------------------------------------+");
-	}
-
-	if (!description.empty()) {
-		embed.add_field("Description", description);
-		embed.add_field("", "+-----------------------------------------------------------------+");
-	}
-
-	embed.set_timestamp(time(nullptr));
-
-	if (!media.empty() && media.contains("oembed")) {
-		if (media["oembed"].contains("thumbnail_url")) {
-			embed.set_image(media["oembed"]["thumbnail_url"]);
-		}
-	}
-
-	if (!video.empty()) {
-		embed.set_video(video);
-		embed.add_field("Video", video);
-	}
-
-	return embed;
-}
-
 json parse_reddit_response(json res) {
 	json pre_response;
 	json response;
@@ -699,7 +646,6 @@ const std::vector<std::string> SUBREDDITS = {
 		"drunkdrunkenporn"
 };
 
-
 int getRandomNumber(int min, int max) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
@@ -762,56 +708,93 @@ json fetchSubredditData(const std::string& subreddit, const std::string& top, in
 	return curl.get(url, headers);
 }
 
+dpp::embed reddit_embed(json data) {
+    auto embed = CringeEmbed::createInfo("Here's what I found from Reddit!")
+        .setTitle("Reddit Crawler")
+        .setThumbnail(CringeIcon::LightningIcon)
+        .addField("Subreddit", data["subreddit"], true)
+        .addField("Author", data["author"], true)
+        .addField("Posted", fmt::format("<t:{}:D>", (int)data["time_created"]), true)
+        .addField("Comments", to_string(data["comments"]), true)
+        .addField("Upvotes", to_string(data["upvotes"]), true)
+        .addField("Upvote Ratio", fmt::format("{}%", (int)data["upvote_ratio"] * 100), true);
+
+    if (!data["title"].empty()) {
+        embed.addField("Title", data["title"]);
+    }
+
+    if (!data["description"].empty()) {
+        embed.addField("Description", data["description"]);
+    }
+
+    if (!data["media"].empty() && data["media"].contains("oembed")) {
+        if (data["media"]["oembed"].contains("thumbnail_url")) {
+            embed.setImage(data["media"]["oembed"]["thumbnail_url"]);
+        }
+    }
+
+    if (!data["video"].empty()) {
+        embed.setImage(data["video"])
+            .addField("Video", data["video"], false);
+    }
+
+    return embed.build();
+}
+
 void reddit_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
-	event.thinking();
-	CringeCurl curl;
+    event.thinking();
+    CringeCurl curl;
 
-	std::string subreddit = std::get<std::string>(event.get_parameter("subreddit"));
-	std::string top = std::get<std::string>(event.get_parameter("top"));
+    std::string subreddit = std::get<std::string>(event.get_parameter("subreddit"));
+    std::string top = std::get<std::string>(event.get_parameter("top"));
 
-	int limit = (top == "random") ? 1000 : 25;
+    int limit = (top == "random") ? 1000 : 25;
 
-	try {
-		if (subreddit == "random") {
-			subreddit = getRandomSubreddit(SUBREDDITS);
-		}
-		if (top == "random") {
-			top = getRandomTimePeriod();
-		}
+    try {
+        if (subreddit == "random") {
+            subreddit = getRandomSubreddit(SUBREDDITS);
+        }
+        if (top == "random") {
+            top = getRandomTimePeriod();
+        }
 
-		json response = fetchSubredditData(subreddit, top, limit);
-		json valid_posts = extractValidPosts(response);
-		json post = getRandomPost(valid_posts);
+        json response = fetchSubredditData(subreddit, top, limit);
+        json valid_posts = extractValidPosts(response);
+        json post = getRandomPost(valid_posts);
 
-		if (post.empty()) {
-			CringeEmbed cringe_embed;
-			cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
-			cringe_embed.setColor(CringeColor::CringeError);
-			cringe_embed.setFields({{"Error", "No valid posts could be obtained!", "false"}});
-			dpp::message msg(event.command.channel_id, cringe_embed.embed);
-			event.edit_original_response(msg);
-			return;
-		}
-		CringeEmbed cringe_embed;
-		cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
-		cringe_embed.setFields(
-				{
-						{"Subreddit",   post["subreddit"],   "true"},
-						{"Author",      post["author"],      "true"},
-						{"description", post["description"], "false"}
-				}
-		);
-		cringe_embed.setImage(post["image"]);
-		dpp::message msg(event.command.channel_id, cringe_embed.embed);
-		event.edit_original_response(msg);
-	} catch (const json::invalid_iterator &e) {
-		CringeEmbed cringe_embed;
-		cringe_embed.setTitle("Reddit Viewer").setHelp("view subreddits with /reddit!");
-		cringe_embed.setColor(CringeColor::CringeError);
-		cringe_embed.setFields({{"Error!!!", fmt::format("{}", "you stupid idiot. KLIM!"), "false"}});
-		dpp::message msg(event.command.channel_id, cringe_embed.embed);
-		event.edit_original_response(msg);
-		return;
-	}
+        if (post.empty()) {
+//            ErrorEmbedService error_embed("No valid posts could be found!");
+//            error_embed.setTitle("Reddit Viewer")
+//                      .addField("Subreddit", subreddit, true)
+//                      .addField("Timeframe", top, true);
+//
+            dpp::message msg(event.command.channel_id, "No valid posts");
+            event.edit_original_response(msg);
+            return;
+        }
 
+//		BaseEmbedService embed;
+//        embed.setTitle("Reddit Viewer")
+//             .setDescription("Here's what I found!")
+//             .addField("Subreddit", post["subreddit"], true)
+//             .addField("Author", post["author"], true)
+//             .addField("Description", post["description"], false);
+//
+//        if (post.contains("image")) {
+//            embed.setImage(post["image"]);
+//        }
+
+        dpp::message msg(event.command.channel_id, "erm");
+        event.edit_original_response(msg);
+
+    } catch (const json::invalid_iterator &e) {
+//        ErrorEmbedService error_embed("Failed to fetch Reddit post!");
+//        error_embed.setTitle("Reddit Error")
+//                  .setDescription(fmt::format("Error: {}", e.what()))
+//                  .addField("Subreddit", subreddit, true)
+//                  .addField("Timeframe", top, true);
+
+        dpp::message msg(event.command.channel_id, "fail");
+        event.edit_original_response(msg);
+    }
 }

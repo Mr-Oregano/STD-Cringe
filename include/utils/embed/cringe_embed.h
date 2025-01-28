@@ -1,37 +1,65 @@
-#ifndef CRINGE_CRINGE_EMBED_H
-#define CRINGE_CRINGE_EMBED_H
+#ifndef CRINGE_EMBED_H
+#define CRINGE_EMBED_H
 
 #include <dpp/dpp.h>
-#include "utils/audio/cringe_song.h"
+#include <string>
+#include <vector>
+#include <memory>
 #include "utils/misc/cringe_color.h"
 #include "utils/misc/cringe_icon.h"
+#include <numeric>
 
-using json = nlohmann::json;
-
-dpp::embed now_streaming(CringeSong song);
-dpp::embed info_embed(const std::string& title, const std::string& response, const std::string& avatar_url, const std::string& mention, const std::string& created, const std::string& joined_at, const std::string& premium, const std::string& nitro, const std::string& bot);
+#include "utils/database/embed_store.h"
 
 class CringeEmbed {
 public:
-	CringeEmbed();
-	~CringeEmbed();
-	dpp::embed embed;
-	int color = CringeColor::CringePrimary;
-	std::string icon = CringeIcon::TerminalIcon;
-	std::string title = "Cringe Embed";
-	std::string profile_pic = "https://cdn.discordapp.com/avatars/1186860332845629511/2b20f3636a5bd288bca2eb197badf556.png";
-	std::string help = "use a command with slashcommands!";
-	CringeEmbed& setTitle(const std::string &embed_title);
-	CringeEmbed& setIcon(const std::string &icon);
-	CringeEmbed& setColor(const int &color);
-	CringeEmbed& setFields(const std::vector<std::vector<std::string>> &fields);
-	CringeEmbed& setHelp(const std::string &help_text);
-	CringeEmbed& setDescription(const std::string &embed_description);
-	CringeEmbed& setImage(const std::string &embed_image);
+    // Constructors
+    CringeEmbed();
+    explicit CringeEmbed(const std::string& title, const std::string& description = "");
+    virtual ~CringeEmbed() = default;
+
+    // Core embed building methods
+    CringeEmbed& setTitle(const std::string& title);
+    CringeEmbed& setDescription(const std::string& description);
+    CringeEmbed& setColor(uint32_t color);
+    CringeEmbed& setThumbnail(const std::string& url);
+    CringeEmbed& setImage(const std::string& url);
+    CringeEmbed& setFooter(const std::string& text, const std::string& icon_url = "");
+    CringeEmbed& addField(const std::string& name, const std::string& value, bool inline_field = false);
+    CringeEmbed& setTimestamp(time_t timestamp = time(nullptr));
+    CringeEmbed& setAuthor(const std::string& name, const std::string& url = "", const std::string& icon_url = "");
+    CringeEmbed& setUrl(const std::string& url);
+
+    // Factory methods for different embed types
+    static CringeEmbed createSuccess(const std::string& description, const std::string& title = "Success");
+    static CringeEmbed createError(const std::string& description, const std::string& title = "Error");
+    static CringeEmbed createWarning(const std::string& description, const std::string& title = "Warning");
+    static CringeEmbed createInfo(const std::string& description, const std::string& title = "Information");
+    static CringeEmbed createLoading(const std::string &title, const std::string &description);
+    static CringeEmbed createCommand(const std::string& command_name, const std::string& description);
+
+    // Build method
+    [[nodiscard]] dpp::embed build() const;
+
+    // Helper method for pagination
+    std::vector<dpp::embed> buildPaginated(size_t max_chars = 2000) const;
+    static size_t calculateEmbedSize(const dpp::embed& embed);
+    void sendPaginatedEmbed(
+        const std::vector<dpp::embed>& pages,
+		dpp::snowflake channel_id,
+        dpp::cluster& cluster,
+        EmbedStore& embed_store,
+        dpp::snowflake reply_to = 0  // New parameter
+    ) const;
+    static void sendPaginatedEmbedsSequentially(const std::vector<dpp::embed>& pages, dpp::snowflake channel_id, dpp::cluster& cluster);
+    static dpp::component createNavigationRow(size_t current_page, size_t total_pages);
+
+private:
+    dpp::embed embed;
+    
+    // Helper method for initialization
+    void initializeEmbed(uint32_t color, const std::string& icon = "");
+    static void splitDescription(std::vector<dpp::embed>& embeds, const dpp::embed& base_embed, const std::string& description, size_t max_chars);
 };
 
-CringeEmbed cringe_success_embed(std::string &reason);
-CringeEmbed cringe_warning_embed(std::string &reason);
-CringeEmbed cringe_error_embed(std::string &reason);
-
-#endif
+#endif // CRINGE_EMBED_H

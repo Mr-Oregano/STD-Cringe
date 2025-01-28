@@ -23,11 +23,8 @@
  */
 
 #include "commands/voice/join_command.h"
-
 #include <fmt/format.h>
-
 #include <algorithm>
-
 #include "utils/embed/cringe_embed.h"
 
 dpp::slashcommand join_declaration() {
@@ -57,8 +54,7 @@ void join_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
             std::string error_reason = event.command.usr.get_mention() +
                                        " tried to invite cringe to VC, but "
                                        "provided a non-voice channel.";
-            dpp::message message(event.command.channel_id,
-                                 cringe_error_embed(error_reason).embed);
+            dpp::message message(event.command.channel_id, error_reason);
             event.edit_original_response(message);
             return;
         }
@@ -77,7 +73,7 @@ void join_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
                         "VC, but it is already there.";
                     dpp::message message(
                         event.command.channel_id,
-                        cringe_warning_embed(warning_reason).embed);
+                        warning_reason);
                     event.edit_original_response(message);
                     return;
                 }
@@ -87,8 +83,7 @@ void join_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
         std::string success_reason = event.command.usr.get_mention() +
                                      " asked cringe to join " +
                                      requested_channel.get_mention();
-        dpp::message message(event.command.channel_id,
-                             cringe_success_embed(success_reason).embed);
+        dpp::message message(event.command.channel_id, success_reason);
         event.edit_original_response(message);
         return;
     }
@@ -111,8 +106,7 @@ void join_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
             std::string warning_reason =
                 event.command.usr.get_mention() +
                 " tried to invite cringe to VC, but it is already there.";
-            dpp::message message(event.command.channel_id,
-                                 cringe_warning_embed(warning_reason).embed);
+            dpp::message message(event.command.channel_id, warning_reason);
             event.edit_original_response(message);
             return;
         }
@@ -127,8 +121,7 @@ void join_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
         std::string error_reason =
             "You must be in a VC, or specify a channel if "
             "you wish to invite cringe to VC.";
-        dpp::message message(event.command.channel_id,
-                             cringe_error_embed(error_reason).embed);
+        dpp::message message(event.command.channel_id, error_reason);
         event.edit_original_response(message);
         return;
     }
@@ -137,7 +130,6 @@ void join_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
     // message can be issued
     std::string success_reason =
         event.command.usr.get_mention() + " asked cringe to join.";
-    dpp::message message(event.command.channel_id,
-                         cringe_success_embed(success_reason).embed);
+    dpp::message message(event.command.channel_id, success_reason);
     event.edit_original_response(message);
 }

@@ -54,7 +54,9 @@ void code_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
         }
     } else {
         std::string content = fmt::format("**{} asked**\n{}\n**cringe replied**\n{}", event.command.usr.username, prompt, response);
-        dpp::message cringe_reply(channel.id, content);
+        dpp::message cringe_reply;
+        cringe_reply.channel_id = channel.id;
+        cringe_reply.content = part;
         cringe.cluster.message_create(cringe_reply);
     }
     dpp::message ephemeral_reply(channel.id, fmt::format("Your chat has been responded to in {}!", channel.get_mention()));

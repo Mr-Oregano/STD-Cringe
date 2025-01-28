@@ -34,26 +34,22 @@ dpp::slashcommand describe_declaration() {
 }
 
 void describe_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
-    // Set the command to thinking and set it to ephemeral
     event.thinking(true);
     dpp::channel channel = event.command.channel;
-    /* Get the file id from the parameter attachment. */
-    dpp::snowflake image =
-        std::get<dpp::snowflake>(event.get_parameter("image"));
-    /* Get the attachment that the user inputted from the file id. */
+    dpp::snowflake image = std::get<dpp::snowflake>(event.get_parameter("image"));
     dpp::attachment attachment = event.command.get_resolved_attachment(image);
+    
     json ollama_response = cringe.ollama.chat(attachment.url, "describe");
     std::string response = ollama_response["response"];
-    CringeEmbed cringe_embed;
-    cringe_embed.setTitle("Cringe Describe")
-        .setHelp("describe an image with /describe!")
-        .setDescription(response)
-        .setImage(attachment.url);
-    /* Reply with the file as a URL. */
-    dpp::message message(channel.id, cringe_embed.embed);
-    cringe.cluster.message_create(message);
-    dpp::message ephemeral_reply(
-        event.command.channel.id,
-        fmt::format("cringe has described your image in {}!", channel.get_mention()));
-    event.edit_original_response(ephemeral_reply);
+
+    auto embed = CringeEmbed::createCommand("describe", response)
+        .setImage(attachment.url)
+        .setThumbnail(CringeIcon::AperatureIcon);
+
+    cringe.cluster.message_create(dpp::message(channel.id, embed.build()));
+
+    auto reply_embed = CringeEmbed::createSuccess(
+        fmt::format("Image described in {}!", channel.get_mention())
+    );
+    event.edit_original_response(dpp::message(event.command.channel_id, reply_embed.build()));
 }

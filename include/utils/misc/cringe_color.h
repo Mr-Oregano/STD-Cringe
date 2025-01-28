@@ -8,7 +8,7 @@ namespace CringeColor {
 	const int CringeAccent = 0xC1A0D3;
 	const int CringeError = 0xDC5968;
 	const int CringeSuccess = 0x7EC99C;
-	const int CringeWarning = 0xFCE0B1;
+	const int CringeWarning = 0xFFD952;
 }
 
 #endif

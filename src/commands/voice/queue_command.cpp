@@ -1,61 +1,85 @@
-/*
- * MIT License
- *
- * Copyright (c) 2023 @nulzo
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
- */
-
 #include "commands/voice/queue_command.h"
+#include <fmt/format.h>
+#include "utils/embed/cringe_embed.h"
+
+#include "utils/bot/cringe_bot.h"
 
 dpp::slashcommand queue_declaration() {
-    return dpp::slashcommand().set_name("queue").set_description(
-        "See the current music queue");
+    return dpp::slashcommand()
+        .set_name("queue")
+        .set_description("Manage the music queue")
+        .add_option(dpp::command_option(dpp::co_sub_command, "show", "Show current queue"))
+        .add_option(dpp::command_option(dpp::co_sub_command, "remove", "Remove a song from queue")
+            .add_option(dpp::command_option(dpp::co_integer, "position", "Position in queue", true)))
+        .add_option(dpp::command_option(dpp::co_sub_command, "clear", "Clear the queue"));
 }
 
-void queue_command(const dpp::slashcommand_t &event, CringeQueue queue) {
-    std::string embed_reason;
-    dpp::embed embed;
-    std::queue<CringeSong> current_queue = queue.get_queue();
-    int total_minutes = 0;
-    int total_songs = 0;
-//    // Loop through the temporary queue
-//    while (!current_queue.empty()) {
-//        // Access the front element
-//        CringeSong song = current_queue.front();
-//        total_minutes += atoi(song.duration.c_str());
-//        std::string song_duration = song.duration.c_str();
-//        embed_reason += fmt::format("\n**Title**: {}\n**Length**: {}\n",
-//                                    song.title, song_duration);
-//        total_songs++;
-//        // Remove the front element from the temporary queue
-//        current_queue.pop();
-//    }
-//    embed.add_field(
-//        "Queue Info",
-//        fmt::format("\n**Total Songs**: {}\n**Queue Duration**: {}\n",
-//                    total_songs, total_minutes));
-    embed.set_title("Current Queue")
-        .set_color(CringeColor::CringePrimary)
-        .add_field("Tracks", embed_reason)
-        .set_timestamp(time(nullptr))
-        .set_thumbnail(CringeIcon::MusicIcon);
-    dpp::message message(1081850403920035931, embed);
-    event.reply(message);
+void queue_command(CringeBot& cringe, const dpp::slashcommand_t& event) {
+    event.thinking(true);
+    
+    try {
+        dpp::command_interaction cmd_data = event.command.get_command_interaction();
+        auto& subcommand = cmd_data.options[0];
+        
+        if (subcommand.name == "show") {
+            auto songs = cringe.queue_store->getQueue(event.command.guild_id);
+            
+            if (songs.empty()) {
+                event.edit_original_response(dpp::message(
+                    event.command.channel_id,
+                    CringeEmbed::createInfo("Queue is empty").build()
+                ));
+                return;
+            }
+            
+            std::string queue_list;
+            int total_duration = 0;
+            
+            for (size_t i = 0; i < songs.size(); i++) {
+                const auto& song = songs[i];
+                if (song.duration) {
+                    total_duration += static_cast<int>(song.duration->count()) / 60;
+                }
+                queue_list += fmt::format("\n**{}. {}**\nDuration: {} minutes\n",
+                    i + 1, song.title,
+                    song.duration ? (song.duration->count() / 60) : 0);
+            }
+            
+            auto embed = CringeEmbed::createCommand("queue", "Current music queue")
+                .setThumbnail(CringeIcon::MusicIcon)
+                .addField("Queue Info",
+                    fmt::format("\n**Total Songs**: {}\n**Queue Duration**: {} minutes\n",
+                        songs.size(), total_duration))
+                .addField("Tracks", queue_list);
+                
+            event.edit_original_response(dpp::message(
+                event.command.channel_id, embed.build()
+            ));
+        }
+        else if (subcommand.name == "remove") {
+            size_t position = std::get<int64_t>(subcommand.options[0].value) - 1;
+            cringe.queue_store->removeSong(event.command.guild_id, position);
+            
+            event.edit_original_response(dpp::message(
+                event.command.channel_id,
+                CringeEmbed::createSuccess(
+                    fmt::format("Removed song at position {}", position + 1)
+                ).build()
+            ));
+        }
+        else if (subcommand.name == "clear") {
+            cringe.queue_store->clearQueue(event.command.guild_id);
+            
+            event.edit_original_response(dpp::message(
+                event.command.channel_id,
+                CringeEmbed::createSuccess("Queue cleared").build()
+            ));
+        }
+    }
+    catch (const std::exception& e) {
+        event.edit_original_response(dpp::message(
+            event.command.channel_id,
+            CringeEmbed::createError(fmt::format("Error: {}", e.what())).build()
+        ));
+    }
 }

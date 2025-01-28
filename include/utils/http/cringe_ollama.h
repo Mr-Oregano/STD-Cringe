@@ -13,7 +13,8 @@ class CringeOllama {
 public:
 	CringeOllama(const std::string &endpoint);
 	~CringeOllama();
-	json chat(const std::string &model, const std::string &prompt);
+	json chat(const std::string &model, const std::string &prompt, const std::string& system_prompt = "", const std::vector<std::pair<std::string, std::string>>& context = {});
+	json oneshot(const std::string& model, const std::string& prompt, const std::string& system_prompt = "");
 	json list();
 private:
 	CringeCurl curl;

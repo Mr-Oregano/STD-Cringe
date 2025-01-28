@@ -23,6 +23,9 @@
  */
 
 #include "utils/bot/cringe_bot.h"
+#include "utils/misc/cringe_environment.h"
+#include "utils/database/cringe_database.h"
+#include "utils/database/queue_store.h"
 
 const std::string OLLAMA_URL = "http://192.168.0.25:11434";
 
@@ -30,34 +33,40 @@ struct Config {
     std::string token;
     std::string guild;
 	std::string ollama;
+    std::string openai_key;
+	std::string system_prompt;
+};
+
+Config load_config() {
+    Config config;
+    
+    // Load required bot token
+    config.token = get_env("NEW_BOT_TOKEN");
+    if (config.token.empty()) {
+        throw std::runtime_error("NEW_BOT_TOKEN not found in .env file");
+    }
+    
+    // Load optional OpenAI key
+    config.openai_key = get_env("OPEN_AI_AUTH");
+
+	// Load the environment variables for the system prompt
+	config.system_prompt = get_env("SYSTEM_PROMPT");
+    
+    // Load optional guild ID
+    config.guild = get_env("GUILD");
+    
+    // Load Ollama endpoint (with fallback to default)
+    config.ollama = get_env("OLLAMA_ENDPOINT");
+    if (config.ollama.empty()) {
+        config.ollama = OLLAMA_URL;
+    }
+    
+    return config;
 };
 
 auto main(int argc, char *argv[]) -> int {
-    /* Main entrance for the Cringe bot. Several command line arguments can be
-     * given with the following descriptions:
-     * - token (required): The discord token to run the bot.
-     * - guild (optional): The guild you want the bot to be accessed in.
-     * */
-
-    std::unordered_map<std::string, std::string> args;
-    for (int i = 1; i < argc; i++) {
-        std::string arg = argv[i];
-        if (arg.substr(0, 2) == "--") {
-            size_t equalsPos = arg.find('=');
-            if (equalsPos != std::string::npos) {
-                std::string name = arg.substr(2, equalsPos - 2);
-                std::string value = arg.substr(equalsPos + 1);
-                args[name] = value;
-            }
-        }
-    }
-
-    auto token = args.find("token");
-    if (token == args.end()) {
-        std::cerr << "Must provide bot token!\n";
-        return -1;
-    }
-
-    CringeBot cringe(token->second, OLLAMA_URL);
+	const Config config = load_config();
+    LogVerbosity verbosity = LogVerbosity::DEBUG;  // default verbosity
+    CringeBot cringe(config.token, config.ollama, config.openai_key, verbosity);
     return 0;
 }

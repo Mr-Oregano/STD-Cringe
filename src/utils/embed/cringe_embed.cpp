@@ -1,183 +1,328 @@
-/*
- * MIT License
- *
- * Copyright (c) 2023 @nulzo
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
- */
-
 #include "utils/embed/cringe_embed.h"
-#include <unordered_map>
-#include "fmt/format.h"
-#include "utils/audio/cringe_song.h"
-
-dpp::embed info_embed(const std::string &title, const std::string &response,
-                      const std::string &avatar_url, const std::string &mention,
-                      const std::string &created, const std::string &joined_at,
-                      const std::string &premium, const std::string &nitro,
-                      const std::string &bot) {
-    return dpp::embed()
-        .set_color(CringeColor::CringeDark)
-        .set_title(title)
-        .set_description(response)
-        .set_thumbnail(avatar_url)
-        .add_field("Username", mention, true)
-        .add_field("Account Created", created, true)
-        .add_field("Joined Server", joined_at, true)
-        .add_field("Booster", premium, true)
-        .add_field("Nitro", nitro, true)
-        .add_field("Bot", bot, true)
-        .set_timestamp(time(nullptr));
-}
-
-CringeEmbed &CringeEmbed::setTitle(const std::string &embed_title) {
-    embed.set_title(embed_title);
-    return *this;
-}
+#include <fmt/format.h>
 
 CringeEmbed::CringeEmbed() {
-    embed = dpp::embed();
-    embed.set_title(title)
+    initializeEmbed(CringeColor::CringePrimary);
+}
+
+CringeEmbed::CringeEmbed(const std::string& title, const std::string& description) {
+    initializeEmbed(CringeColor::CringePrimary);
+    setTitle(title);
+    setDescription(description);
+}
+
+void CringeEmbed::initializeEmbed(uint32_t color, const std::string& icon) {
+    embed = dpp::embed()
         .set_color(color)
-        .set_thumbnail(icon)
-        .set_timestamp(time(nullptr))
-        .set_footer(help, profile_pic);
+        .set_timestamp(time(nullptr));
+    
+    if (!icon.empty()) {
+        embed.set_thumbnail(icon);
+    }
 }
 
-CringeEmbed::~CringeEmbed() = default;
-
-CringeEmbed &CringeEmbed::setHelp(const std::string &help_text) {
-    embed.set_footer(help_text, profile_pic);
+CringeEmbed& CringeEmbed::setTitle(const std::string& title) {
+    embed.set_title(title);
     return *this;
 }
 
-CringeEmbed &CringeEmbed::setIcon(const std::string &embed_icon) {
-    embed.set_thumbnail(embed_icon);
+CringeEmbed& CringeEmbed::setDescription(const std::string& description) {
+    embed.set_description(description);
     return *this;
 }
 
-CringeEmbed &CringeEmbed::setColor(const int &embed_color) {
-    embed.set_color(embed_color);
+CringeEmbed& CringeEmbed::setColor(uint32_t color) {
+    embed.set_color(color);
     return *this;
 }
 
-CringeEmbed &
-CringeEmbed::setFields(const std::vector<std::vector<std::string>> &fields) {
-    std::string part;
-    int chunk_max = 1024;
-    if (!fields.empty()) {
-        for (const auto &field : fields) {
-            if (field[1].length() >= chunk_max) {
-                for (size_t i = 0; i < field[1].length(); i += chunk_max) {
-                    std::string chunk = field[1].substr(i, chunk_max);
-                    part = (i == 0) ? field[0] : "";
-                    embed.add_field(part, chunk);
-                }
-            } else {
-                embed.add_field(field[0], field[1], field[2] == "true");
-            }
+CringeEmbed& CringeEmbed::setThumbnail(const std::string& url) {
+    embed.set_thumbnail(url);
+    return *this;
+}
+
+CringeEmbed& CringeEmbed::setImage(const std::string& url) {
+    embed.set_image(url);
+    return *this;
+}
+
+CringeEmbed& CringeEmbed::setFooter(const std::string& text, const std::string& icon_url) {
+    embed.set_footer(text, icon_url);
+    return *this;
+}
+
+CringeEmbed& CringeEmbed::addField(const std::string& name, const std::string& value, bool inline_field) {
+    if (value.length() >= 1024) {
+        size_t chunk_max = 1024;
+        for (size_t i = 0; i < value.length(); i += chunk_max) {
+            std::string chunk = value.substr(i, chunk_max);
+            std::string field_name = (i == 0) ? name : "";
+            embed.add_field(field_name, chunk, inline_field);
         }
+    } else {
+        embed.add_field(name, value, inline_field);
     }
     return *this;
 }
 
-CringeEmbed &CringeEmbed::setDescription(const std::string &embed_description) {
-    embed.set_description(embed_description);
+CringeEmbed& CringeEmbed::setTimestamp(time_t timestamp) {
+    embed.set_timestamp(timestamp);
     return *this;
 }
 
-CringeEmbed &CringeEmbed::setImage(const std::string &embed_image) {
-    embed.set_image(embed_image);
+CringeEmbed& CringeEmbed::setAuthor(const std::string& name, const std::string& url, const std::string& icon_url) {
+    embed.set_author(name, url, icon_url);
     return *this;
 }
 
-dpp::embed now_streaming(CringeSong song) {
-    // Define variables
-    dpp::embed embed;
-    std::string title;
-    std::string duration;
-    std::string author;
-    std::string footer;
-    std::string channel;
-    dpp::slashcommand_t event;
+CringeEmbed& CringeEmbed::setUrl(const std::string& url) {
+    embed.set_url(url);
+    return *this;
+}
 
-    // Get data from the song object
-    title = song.title;
-    duration = atoi(song.duration.c_str());
-    author = song.artist;
-//    event = song.get_event();
-    channel =
-        find_channel(event.from->get_voice(event.command.guild_id)->channel_id)
-            ->get_mention();
-    footer = fmt::format("Requested by: {}", event.command.usr.global_name);
-    // Set the title and assign it an icon
-    embed.set_title("Now Streaming")
-        .set_thumbnail(CringeIcon::MusicIcon);
-    // Set the title field
-    embed.add_field("Title", title);
-    embed.add_field("Author", author);
-    // Set the URL field
-    embed.add_field("URL", song.url);
-    // Set the first row of embed fields
-    embed.add_field("Streaming in", channel, true)
-        .add_field("Duration", duration, true)
-        .add_field("Upload Date",
-                   fmt::format("<t:{}:D>", song.upload_date), true);
-    ;
-    // Set the image to the thumbnail of the YT video
-    embed.set_image(song.thumbnail);
-    embed.add_field("Comments", song.comment_count, true)
-        .add_field("Views", song.view_count, true)
-        .add_field("Subscribers", song.subscriber_count, true);
-    // Set the color of the embed
-    embed.set_color(CringeColor::CringePrimary);
-    // Set the footer to tell the server who requested the song
-    embed.set_footer(footer, event.command.usr.get_avatar_url());
-    // Add a timestamp to the embed
-    embed.set_timestamp(time(nullptr));
+CringeEmbed CringeEmbed::createSuccess(const std::string& description, const std::string& title) {
+    CringeEmbed embed;
+    embed.initializeEmbed(CringeColor::CringeSuccess, CringeIcon::SuccessIcon);
+    return embed.setTitle(title).setDescription(description);
+}
 
+CringeEmbed CringeEmbed::createError(const std::string& description, const std::string& title) {
+    CringeEmbed embed;
+    embed.initializeEmbed(CringeColor::CringeError, CringeIcon::ErrorIcon);
+    return embed.setTitle(title).setDescription(description);
+}
+
+CringeEmbed CringeEmbed::createWarning(const std::string& description, const std::string& title) {
+    CringeEmbed embed;
+    embed.initializeEmbed(CringeColor::CringeWarning, CringeIcon::WarningIcon);
+    return embed.setTitle(title).setDescription(description);
+}
+
+CringeEmbed CringeEmbed::createInfo(const std::string& description, const std::string& title) {
+    CringeEmbed embed;
+    embed.initializeEmbed(CringeColor::CringePrimary, CringeIcon::InfoIcon);
+    return embed.setTitle(title).setDescription(description);
+}
+
+CringeEmbed CringeEmbed::createLoading(const std::string& title, const std::string& description) {
+    CringeEmbed embed;
+    embed.initializeEmbed(CringeColor::CringePrimary, "https://app.btassociation.com/loading.gif");
+    return embed.setTitle(title).setDescription(description);
+}
+
+CringeEmbed CringeEmbed::createCommand(const std::string& command_name, const std::string& description) {
+    CringeEmbed embed;
+    embed.initializeEmbed(CringeColor::CringeSecondary, CringeIcon::TerminalIcon);
+    return embed.setTitle(fmt::format("/{}", command_name))
+               .setDescription(description)
+               .setFooter("Use /help for more information");
+}
+
+size_t CringeEmbed::calculateEmbedSize(const dpp::embed& embed) {
+    size_t total = 0;
+    
+    if (!embed.title.empty()) total += embed.title.length();
+    if (!embed.description.empty()) total += embed.description.length();
+    if (!embed.footer->text.empty()) total += embed.footer->text.length();
+    if (!embed.author->name.empty()) total += embed.author->name.length();
+    
+    for (const auto& field : embed.fields) {
+        total += field.name.length() + field.value.length();
+    }
+    
+    return total;
+}
+
+void CringeEmbed::splitDescription(std::vector<dpp::embed>& embeds, const dpp::embed& base_embed,
+                                 const std::string& description, size_t max_chars) {
+    size_t chunk_size = max_chars - 200; // Buffer for other embed elements
+    
+    for (size_t i = 0; i < description.length(); i += chunk_size) {
+        dpp::embed page = base_embed;
+        std::string chunk = description.substr(i, chunk_size);
+        page.set_description(chunk);
+
+        // Get the original footer text if it exists
+        std::string original_footer = "";
+        if (base_embed.footer && !base_embed.footer->text.empty()) {
+            original_footer = base_embed.footer->text;
+            // Remove any existing page numbers if present
+            size_t page_pos = original_footer.find(" • Page ");
+            if (page_pos != std::string::npos) {
+                original_footer = original_footer.substr(0, page_pos);
+            }
+        }
+
+        // Create new footer with both conversation ID and page numbers
+        dpp::embed_footer footer;
+        footer.text = fmt::format("{}{} • Page {}/{}",
+            original_footer,
+            original_footer.empty() ? "" : " ",
+            embeds.size() + 1,
+            (description.length() + chunk_size - 1) / chunk_size
+        );
+        page.set_footer(footer);
+        embeds.push_back(page);
+    }
+}
+
+std::vector<dpp::embed> CringeEmbed::buildPaginated(size_t max_chars) const {
+    std::vector<dpp::embed> pages;
+    
+    if (calculateEmbedSize(embed) <= max_chars) {
+        pages.push_back(embed);
+        return pages;
+    }
+    
+    // Create base embed without description and fields
+    dpp::embed base = embed;
+    base.description = "";
+    base.fields.clear();
+    
+    // Split description if it exists
+    if (!embed.description.empty()) {
+        splitDescription(pages, base, embed.description, max_chars);
+    }
+    
+    // Handle fields in the last page or create new pages if needed
+    dpp::embed current_page = pages.empty() ? base : pages.back();
+    bool has_changes = false;
+
+    for (const auto& field : embed.fields) {
+        size_t field_size = field.name.length() + field.value.length();
+
+        if (calculateEmbedSize(current_page) + field_size > max_chars) {
+            if (!pages.empty() && has_changes) {
+                pages.back() = current_page;
+            }
+            current_page = base;
+            current_page.add_field(field.name, field.value, field.is_inline);
+            pages.push_back(current_page);  // Add the page immediately
+            has_changes = false;
+        } else {
+            current_page.add_field(field.name, field.value, field.is_inline);
+            has_changes = true;
+        }
+    }
+
+    // Add the last page if it has any changes that weren't added
+    if (has_changes) {
+        pages.push_back(current_page);
+    }
+
+    // Update page numbers in footers
+    for (size_t i = 0; i < pages.size(); i++) {
+        dpp::embed_footer footer;
+        footer.text = fmt::format("Page {}/{}", i + 1, pages.size());
+        pages[i].set_footer(footer);
+    }
+
+    return pages;
+}
+
+// Helper function to send paginated embeds sequentially
+void CringeEmbed::sendPaginatedEmbedsSequentially(const std::vector<dpp::embed>& pages,
+                                   dpp::snowflake channel_id,
+                                   dpp::cluster& cluster) {
+    std::function<void(size_t)> send_next = [&](size_t index) {
+        if (index >= pages.size()) return;
+
+        dpp::message msg(channel_id, pages[index]);
+        cluster.message_create(msg, [&send_next, index](const dpp::confirmation_callback_t& callback) {
+            if (!callback.is_error()) {
+                send_next(index + 1);
+            }
+        });
+    };
+
+    send_next(0);
+}
+
+dpp::embed CringeEmbed::build() const {
     return embed;
 }
 
-CringeEmbed cringe_success_embed(std::string &reason) {
-    CringeEmbed embed;
-    embed.setTitle("Success");
-    embed.setColor(CringeColor::CringeSuccess);
-    embed.setIcon(CringeIcon::SuccessIcon);
-    embed.setDescription(reason);
-    return embed;
+dpp::component CringeEmbed::createNavigationRow(size_t current_page, size_t total_pages) {
+    // Create action row
+    dpp::component action_row;
+    action_row.set_type(dpp::cot_action_row);
+
+    // Previous page button
+    dpp::component prev_button;
+    prev_button.set_type(dpp::cot_button)
+               .set_label("previous")
+               .set_style(dpp::cos_secondary)
+               .set_id("prev_page")
+               .set_disabled(current_page == 0);
+    action_row.add_component(prev_button);
+
+    // Page indicator
+    dpp::component page_indicator;
+    page_indicator.set_type(dpp::cot_button)
+                  .set_style(dpp::cos_secondary)
+                  .set_label(fmt::format("Page {}/{}", current_page + 1, total_pages))
+                  .set_id("page_indicator")
+                  .set_disabled(true);
+    action_row.add_component(page_indicator);
+
+    // Next page button
+    dpp::component next_button;
+    next_button.set_type(dpp::cot_button)
+               .set_label("next")
+               .set_style(dpp::cos_secondary)
+               .set_id("next_page")
+               .set_disabled(current_page >= total_pages - 1);
+    action_row.add_component(next_button);
+
+    return action_row;
 }
 
-CringeEmbed cringe_warning_embed(std::string &reason) {
-    CringeEmbed embed;
-    embed.setTitle("Warning");
-    embed.setColor(CringeColor::CringeWarning);
-    embed.setIcon(CringeIcon::WarningIcon);
-    embed.setDescription(reason);
-    return embed;
-}
+void CringeEmbed::sendPaginatedEmbed(
+    const std::vector<dpp::embed>& pages,
+    dpp::snowflake channel_id,
+    dpp::cluster& cluster,
+    EmbedStore& embed_store,
+    dpp::snowflake reply_to
+) const {
+    std::cout << "Sending paginated embed" << std::endl;
+    if (pages.empty()) {
+        std::cout << "No pages to send" << std::endl;
+        return;
+    }
+    std::cout << "Pages to send: " << pages.size() << std::endl;
 
-CringeEmbed cringe_error_embed(std::string &reason) {
-    CringeEmbed embed;
-    embed.setTitle("Error");
-    embed.setColor(CringeColor::CringeError);
-    embed.setIcon(CringeIcon::ErrorIcon);
-    embed.setDescription(reason);
-    return embed;
+    // Create initial message with first page and navigation buttons
+    dpp::message msg(channel_id, pages[0]);
+    std::cout << "Creating initial message" << std::endl;
+    msg.add_component(createNavigationRow(0, pages.size()));
+    std::cout << "Navigation row added" << std::endl;
+
+    // Set message reference if provided
+    if (reply_to != 0) {
+        std::cout << "Sending reply" << std::endl;
+        cluster.channel_get(channel_id, [&cluster, &msg, reply_to, channel_id](const dpp::confirmation_callback_t& cb) {
+            if (!cb.is_error()) {
+                auto channel = std::get<dpp::channel>(cb.value);
+                msg.set_reference(reply_to, channel.guild_id, channel_id);
+                std::cout << "Message reference set with guild_id: " << channel.guild_id << std::endl;
+            } else {
+                msg.set_reference(reply_to);
+                std::cout << "Channel fetch failed, using simple reference" << std::endl;
+            }
+        });
+    }
+
+    std::cout << "Sending initial message" << std::endl;
+    // Send initial message
+    cluster.message_create(msg, [&embed_store, pages, channel_id](const dpp::confirmation_callback_t& callback) {
+        if (callback.is_error()) {
+            std::cout << "Failed to send initial message" << std::endl;
+            std::cout << callback.get_error().message << std::endl;
+            return;
+        }
+        dpp::message sent_msg = std::get<dpp::message>(callback.value);
+        std::cout << "Message sent" << std::endl;
+        embed_store.storeEmbedPages(sent_msg.id, channel_id, pages);
+        std::cout << "Embed pages stored" << std::endl;
+    });
 }

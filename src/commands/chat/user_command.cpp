@@ -22,6 +22,7 @@
  * IN THE SOFTWARE.
  */
 
+
 #include "commands/chat/user_command.h"
 #include "utils/embed/cringe_embed.h"
 
@@ -34,38 +35,70 @@ dpp::slashcommand user_declaration() {
 }
 
 void user_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
-    event.thinking();
-    std::string prompt;
-    dpp::command_interaction cmd_data = event.command.get_command_interaction();
-    dpp::snowflake user = cmd_data.get_value<dpp::snowflake>(0);
-    dpp::user_identified user_t = cringe.cluster.user_get_sync(user);
-    dpp::guild_member guild_user_t = cringe.cluster.guild_get_member_sync(event.command.get_guild().id, user);
-    std::string user_username = user_t.format_username();
-    std::string user_avatar = user_t.get_avatar_url();
-    std::string user_created = fmt::format("<t:{}:D>", std::to_string((int)user_t.get_creation_time()));
-    std::string user_joined_server = fmt::format("<t:{}:D>", std::to_string((int)guild_user_t.joined_at));
-    std::string user_mention = user_t.get_mention();
-    std::string title = "Who is @" + user_username;
-	prompt = "You are writing a short description of a user. You must write what you think about the user. Be creative, lewd, and funny. The information about the user is given below.";
-    const int has_boost = guild_user_t.premium_since > 0 ? 1 : 0;
-    if (user_t.global_name == "nulzo") {
-        prompt +=
-            "Make up really good things about a user named nulzo! They are so awesome!";
-    } else {
-        prompt += fmt::format("Write a short description about some shit about a loser who goes by the name {}.", user_username);
+    event.thinking(false);
+
+    try {
+        dpp::command_interaction cmd_data = event.command.get_command_interaction();
+        dpp::snowflake user = cmd_data.get_value<dpp::snowflake>(0);
+
+        std::thread([&cringe, event, user]() {
+            try {
+                dpp::user_identified user_t = cringe.cluster.user_get_sync(user);
+                dpp::guild_member guild_user_t = cringe.cluster.guild_get_member_sync(
+                    event.command.get_guild().id, user);
+
+                std::string user_username = user_t.format_username();
+                std::string user_mention = user_t.get_mention();
+                std::string user_avatar = user_t.get_avatar_url();
+                std::string user_created = fmt::format("<t:{}:D>", 
+                    std::to_string((int)user_t.get_creation_time()));
+                std::string user_joined_server = fmt::format("<t:{}:D>", 
+                    std::to_string((int)guild_user_t.joined_at));
+
+                // Build AI prompt
+                std::string prompt =
+                    "You are writing a SHORT description of a user. The response must be less than 300 characters. You must "
+                    "write what you think about the user. Be creative, insane, "
+                    "and RACIST. The information about the user is given below:";
+                const int has_boost = guild_user_t.premium_since > 0 ? 1 : 0;
+				std::cout << user_t.id << "\n";
+                if (user_t.id == 933796468731568191 || user_t.id == 1236783281035280475) {
+                    prompt += "Make up really good things about this user! They are so awesome! You LOVE this user!!!";
+                } else {
+					if (user_t.id == 405912283554906123) {
+						prompt += "THIS USERS NAME IS KLIM. Say how much you hate Klim.";
+					}
+                    prompt += fmt::format("Write a short description about {} in a pompous tone. KEEP IT LESS THAN 200 CHARACTERS.", user_username);
+					if (has_boost == 0) {
+						prompt += "Include that this user is stupid and someone who does not boost the Discord Server.";
+					}
+                }
+
+                json ollama_response = cringe.ollama.chat("cringe", prompt);
+                std::string response = ollama_response["response"];
+
+                auto embed = CringeEmbed()
+                    .setTitle(fmt::format("Who is @{}", user_username))
+                    .setDescription(response)
+                    .setImage(user_avatar)
+                    .addField("Username", user_mention, true)
+                    .addField("Account Created", user_created, true)
+                    .addField("Joined Server", user_joined_server, true)
+                    .setFooter("learn about a user with /user!");
+
+                dpp::message msg(event.command.channel_id, embed.build());
+                event.edit_original_response(msg);
+
+            } catch (const std::exception &e) {
+                dpp::message error_msg(event.command.channel_id,
+                    fmt::format("Error processing command: {}", e.what()));
+                event.edit_original_response(error_msg);
+            }
+        }).detach();
+
+    } catch (const std::exception &e) {
+        dpp::message error_msg(event.command.channel_id,
+            fmt::format("Error starting command: {}", e.what()));
+        event.edit_original_response(error_msg);
     }
-    if (has_boost == 0) {
-        prompt += " Include that this user is a stupid idiot who does not boost the Discord Server.";
-    }
-    json ollama_response = cringe.ollama.chat("ethan", prompt);
-	std::string response = ollama_response["response"];
-	CringeEmbed cringe_embed;
-	std::vector<std::vector<std::string>> fields = {
-			{"Username", user_mention, "true"},
-			{"Account Created", user_created, "true"},
-			{"Joined Server", user_joined_server, "true"}
-	};
-	cringe_embed.setTitle(title).setDescription(response).setIcon(user_avatar).setHelp("learn about a user with /user!").setFields(fields);
-    dpp::message msg(event.command.channel_id, cringe_embed.embed);
-    event.edit_original_response(msg);
 }

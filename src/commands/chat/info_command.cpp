@@ -24,6 +24,8 @@
 #include "fmt/format.h"
 #include "commands/chat/info_command.h"
 #include "utils/misc/cringe_color.h"
+#include "utils/embed/cringe_embed.h"
+#include "utils/misc/cringe_icon.h"
 
 dpp::slashcommand info_declaration() {
     return dpp::slashcommand().set_name("info").set_description(
@@ -31,44 +33,30 @@ dpp::slashcommand info_declaration() {
 }
 
 void info_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
-    dpp::embed embed =
-        dpp::embed()
-            .set_color(CringeColor::CringePrimary)
-            .set_title("std::cringe bot")
-            .set_description(
-                "Probably the **most based** discord bot you've *ever* seen "
-                "in "
-                "your life. Python? Never heard of it. Javascript? That shit "
-                "ain't nothing to me, man. This bot right here was coded in "
-                "pure "
-                "C++, fuck you know about it? Put simply - this bot runs laps "
-                "around your run-of-the-mill shitty bot coded in some "
-                "rinky-dink "
-                "language. Get real, get hard, get **cringe**.")
-            .set_thumbnail(
-                "https://cdn.discordapp.com/avatars/1186860332845629511/"
-                "2b20f3636a5bd288bca2eb197badf556.png")
-            .add_field("Creator",
-                       cringe.cluster.user_get_sync(933796468731568191).get_mention(),
-                       true)
-            .add_field(
-                "Created",
-                fmt::format(
-                    "<t:{}:D>",
-                    std::to_string((int)cringe.cluster.user_get_sync(1186860332845629511)
-                                       .get_creation_time())),
-                true)
-            .add_field("Active In",
-                       std::to_string(dpp::get_guild_cache()->count()) +
-                           " servers",
-                       true)
-            .set_footer(dpp::embed_footer().set_text("v0.0.1")
+    auto embed = CringeEmbed::createInfo("Probably the **most based** discord bot...")
+        .setTitle("std::cringe bot")
+        .setThumbnail(CringeIcon::InfoIcon);
 
-            );
+    cringe.cluster.user_get(933796468731568191, [&embed](const dpp::confirmation_callback_t& callback) {
+        if (!callback.is_error()) {
+            auto user = std::get<dpp::user_identified>(callback.value);
+            embed.addField("Creator", user.get_mention(), true);
+        }
+    });
 
-    /* Create a message with the content as our new embed. */
-    dpp::message msg(event.command.channel_id, embed);
+    cringe.cluster.user_get(1186860332845629511, [&embed](const dpp::confirmation_callback_t& callback) {
+        if (!callback.is_error()) {
+            auto user = std::get<dpp::user_identified>(callback.value);
+            embed.addField("Created", 
+                fmt::format("<t:{}:D>", std::to_string((int)user.get_creation_time())),
+                true);
+        }
+    });
 
-    /* Reply to the user with the message, containing our embed. */
-    event.reply(msg);
+    embed.addField("Active In",
+        std::to_string(dpp::get_guild_cache()->count()) + " servers",
+        true)
+        .setFooter("v0.0.1");
+
+    event.reply(dpp::message(event.command.channel_id, embed.build()));
 }

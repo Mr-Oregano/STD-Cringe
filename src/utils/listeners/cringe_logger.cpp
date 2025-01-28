@@ -25,20 +25,33 @@
 #include "utils/listeners/cringe_logger.h"
 
 CringeLogger::CringeLogger() {
-	const int t_pool_sz = 8192;
-	const int t_pool_snk = 5242880;
-	const int t_pool_cnt = 10;
-	const std::string log_name = "std_cringe.log";
-	std::vector<spdlog::sink_ptr> sinks;
-	spdlog::init_thread_pool(t_pool_sz, 2);
-	auto stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-	auto rotating = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(log_name, t_pool_snk, t_pool_cnt);
-	sinks.push_back(stdout_sink);
-	sinks.push_back(rotating);
-	this->log = std::make_shared<spdlog::async_logger>("| cringe |", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-	spdlog::register_logger(this->log);
-	this->log->set_pattern("%n :: %H:%M:%S :: %^[%=9l]%$ :: %v");
-	this->log->set_level(spdlog::level::level_enum::debug);
+    const int t_pool_sz = 8192;
+    const int t_pool_snk = 5242880;
+    const int t_pool_cnt = 10;
+    const std::string log_name = "std_cringe.log";
+    
+    std::vector<spdlog::sink_ptr> sinks;
+    spdlog::init_thread_pool(t_pool_sz, 2);
+    
+    auto stdout_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto rotating = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+        log_name, t_pool_snk, t_pool_cnt
+    );
+    
+    sinks.push_back(stdout_sink);
+    sinks.push_back(rotating);
+    
+    this->log = std::make_shared<spdlog::async_logger>(
+        "| cringe |", 
+        sinks.begin(), 
+        sinks.end(), 
+        spdlog::thread_pool(), 
+        spdlog::async_overflow_policy::block
+    );
+    
+    spdlog::register_logger(this->log);
+    this->log->set_pattern("%n :: %H:%M:%S :: %^[%=9l]%$ :: %v");
+    this->log->set_level(spdlog::level::debug);
 }
 
 CringeLogger::~CringeLogger() = default;
@@ -94,4 +107,15 @@ void CringeLogger::log_message(const dpp::message_create_t &event) {
 						 color_message(this->CYAN, "sent message"),
 						 color_message(this->MAGENTA, event.msg.content));
 	}
+}
+
+void CringeLogger::log(LogLevel level, const std::string& message) {
+    std::lock_guard<std::mutex> lock(logMutex);
+    auto spdLogLevel = convertToSpdLogLevel(level);
+    log->log(spdLogLevel, message);
+}
+
+void CringeLogger::setLogLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(logMutex);
+    log->set_level(convertToSpdLogLevel(level));
 }

@@ -35,40 +35,59 @@ dpp::slashcommand skip_declaration() {
         "Skip the song that is currently playing");
 }
 
-void skip_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
-    std::string embed_reason;
-	CringeAudioStreamer stream;
-    dpp::embed embed;
+void skip_command(CringeBot& cringe, const dpp::slashcommand_t& event) {
     event.thinking(true);
+    
+    try {
+        // Get voice connection
+        dpp::voiceconn* voice = event.from->get_voice(event.command.guild_id);
+        if (!voice || !voice->voiceclient || !voice->voiceclient->is_ready()) {
+            throw std::runtime_error("Not connected to a voice channel");
+        }
+        std::cout << "Voice connection found\n";
 
-    /* Get the voice channel the bot is in, in this current guild. */
-    dpp::voiceconn *v = event.from->get_voice(event.command.guild_id);
-    if (!v || !v->voiceclient || !v->voiceclient->is_ready()) {
-        std::string error_reason = "Bot was unable to join the voice channel due to some unknown reason.";
-        dpp::message message(event.command.channel_id, cringe_error_embed(error_reason).embed);
-        event.edit_original_response(message);
-        return;
+        // Skip current song if playing
+        if (cringe.audio_streamer) {
+            cringe.audio_streamer->skip();
+        }
+
+        // Get next song from queue
+        auto song = cringe.queue_store->getNextSong(event.command.guild_id);
+        if (!song) {
+            auto empty_embed = CringeEmbed::createSuccess("Queue is empty. Playback stopped.");
+            event.edit_original_response(dpp::message(event.command.channel_id, empty_embed.build()));
+            return;
+        }
+
+    	// Create callback that accepts StreamStatus and can call itself
+    	std::function<void(StreamStatus)> play_next = [audio_streamer = cringe.audio_streamer,
+													 queue_store = cringe.queue_store,
+													 voice = voice,
+													 guild_id = event.command.guild_id,
+													 &play_next](StreamStatus status) {
+    		// Only proceed if the song completed normally
+    		if (status != StreamStatus::Completed) {
+    			return;
+    		}
+
+    		if (auto next = queue_store->getNextSong(guild_id)) {
+    			try {
+    				audio_streamer->stream(voice, *next, play_next);
+    			} catch (const std::exception& e) {
+    				std::cout << "Error in play_next callback: " << e.what() << "\n";
+    			}
+    		}
+        };
+
+        // Start playing next song
+        std::cout << "Starting to play: " << song->title << "\n";
+        cringe.current_stream = cringe.audio_streamer->stream(voice, *song, play_next);
+        
+        auto success_embed = CringeEmbed::createSuccess("Skipped to next song.");
+        event.edit_original_response(dpp::message(event.command.channel_id, success_embed.build()));
+    } catch (const std::exception& e) {
+        std::cerr << "Skip command error: " << e.what() << "\n";
+        auto error_embed = CringeEmbed::createError(e.what());
+        event.edit_original_response(dpp::message(event.command.channel_id, error_embed.build()));
     }
-
-    if (cringe.queue.is_empty() && !v->voiceclient->is_playing()) {
-        std::string error_reason = "There is no song to skip.";
-        dpp::message message(event.command.channel_id, cringe_error_embed(error_reason).embed);
-        event.edit_original_response(message);
-        return;
-    }
-
-	v->voiceclient->skip_to_next_marker();
-
-	if (cringe.queue.is_empty()) {
-		std::string success_reason = "Successfully skipped song. There are no other songs in the queue.";
-		dpp::message message(event.command.channel_id, cringe_success_embed(success_reason).embed);
-		event.edit_original_response(message);
-		return;
-	}
-
-	CringeSong content = cringe.queue.dequeue();
-	stream.stream(v, content);
-    std::string success_reason = "Successfully skipped song. Playing next in queue.";
-    dpp::message message(event.command.channel_id, cringe_success_embed(success_reason).embed);
-    event.edit_original_response(message);
 }

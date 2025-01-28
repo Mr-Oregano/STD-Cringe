@@ -50,17 +50,17 @@ void image_command(CringeBot &cringe, const dpp::slashcommand_t &event) {
     json ollama_response = cringe.ollama.chat(prompt, style);
     std::string image = ollama_response["response"];
     std::string binaryData = cringe64_decode(image);
-    dpp::message message(channel.id, "");
+
+    auto embed = CringeEmbed::createCommand("imagine", prompt)
+        .setImage("attachment://imagine.jpg")
+        .setThumbnail(CringeIcon::AperatureIcon);
+
+    dpp::message message(channel.id, embed.build());
     message.add_file("imagine.jpg", binaryData);
-    CringeEmbed cringe_embed;
-    cringe_embed.setTitle("Cringe Imagine")
-        .setHelp("generate an image with /imagine!")
-        .setImage(fmt::format("attachment://{}", "imagine.jpg"))
-        .setDescription(prompt);
-    message.add_embed(cringe_embed.embed);
     cringe.cluster.message_create(message);
-    dpp::message ephemeral_reply(
-        event.command.channel.id,
-        fmt::format("cringe has responded to your chat in {}!", cringe.cluster.channel_get_sync(channel.id).get_mention()));
-    event.edit_original_response(ephemeral_reply);
+
+    auto reply_embed = CringeEmbed::createSuccess(
+        fmt::format("Image generated in {}!", cringe.cluster.channel_get_sync(channel.id).get_mention())
+    );
+    event.edit_original_response(dpp::message(event.command.channel_id, reply_embed.build()));
 }
