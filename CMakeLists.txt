@@ -14,8 +14,7 @@ include(FetchContent)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 if(APPLE)
-    link_directories(/opt/homebrew/lib)
-    include_directories(/opt/homebrew/include)
+    print("This is the dumbest fucking OS on the planet")
 endif()
 
 add_executable(${PROJECT_NAME}
